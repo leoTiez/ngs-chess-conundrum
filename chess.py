@@ -154,7 +154,7 @@ def main(args):
             fig.tight_layout()
             if save_fig:
                 Path('figures/power_of_%d' % n_pos).mkdir(exist_ok=True, parents=True)
-                plt.savefig('figures/power_of_%d/%s_all_possible_nodes_weighted%d.png' % (save_prefix, n_pos, i_iter))
+                plt.savefig('figures/power_of_%d/%s_all_possible_nodes_weighted%d.png' % (n_pos, save_prefix, i_iter))
                 plt.close()
             else:
                 plt.show()
@@ -220,7 +220,7 @@ def main(args):
         fig.tight_layout()
         if save_fig:
             Path('figures/power_of_%d' % n_pos).mkdir(exist_ok=True, parents=True)
-            plt.savefig('figures/power_of_%d/%s_naive_%d.png' % (save_prefix, n_pos, i_iter))
+            plt.savefig('figures/power_of_%d/%s_naive_%d.png' % (n_pos, save_prefix, i_iter))
             plt.close()
         else:
             plt.show()
@@ -231,7 +231,7 @@ def main(args):
         n_node_overlap = len(set(likely_subgraph.nodes).intersection(path))
         Path('data/power_of_%d/path_determination' % n_pos).mkdir(exist_ok=True, parents=True)
         with open('data/power_of_%d/path_determination/%s_naive_%d.txt'
-                  % (save_prefix, n_pos, i_iter), 'w') as naive_file:
+                  % (n_pos, save_prefix, i_iter), 'w') as naive_file:
             naive_file.write('%d\n' % n_likely_nodes)
             naive_file.write('%d\n' % l_path)
             naive_file.write('%d\n' % n_node_overlap)
@@ -242,7 +242,7 @@ def main(args):
         )
         plt.title('Overlap of states based on data\nno total reference', fontsize=21)
         if save_fig:
-            plt.savefig('figures/power_of_%d/%s_naive_venn_%d.png' % (save_prefix, n_pos, i_iter))
+            plt.savefig('figures/power_of_%d/%s_naive_venn_%d.png' % (n_pos, save_prefix, i_iter))
             plt.close()
         else:
             plt.show()
@@ -271,8 +271,8 @@ def main(args):
             print('Overlap No Reference Structure: %d' % n_lp_overlap)
             with open(
                     'data/power_of_%d/path_determination/%s_noref_structure_%d_%s_path%d.txt' % (
-                            save_prefix,
                             n_pos,
+                            save_prefix,
                             i_iter,
                             weighting_str,
                             i_path
@@ -286,7 +286,7 @@ def main(args):
             )
             plt.title('Overlap of states based on network structure\nno total reference')
             if save_fig:
-                plt.savefig('figures/power_of_%d/%s_noref_venn_%d_path%d.png' % (save_prefix, n_pos, i_iter, i_path))
+                plt.savefig('figures/power_of_%d/%s_noref_venn_%d_path%d.png' % (n_pos, save_prefix, i_iter, i_path))
                 plt.close()
             else:
                 plt.show()
@@ -311,7 +311,7 @@ def main(args):
         cax = plt.axes([.87, 0.1, 0.03, 0.7])
         plt.colorbar(sm, cax=cax, orientation='vertical', label='weighting')
         if save_fig:
-            plt.savefig('figures/power_of_%d/%s_noref_structure_%d.png' % (save_prefix, n_pos, i_iter))
+            plt.savefig('figures/power_of_%d/%s_noref_structure_%d.png' % (n_pos, save_prefix, i_iter))
             plt.close()
         else:
             plt.show()
@@ -338,8 +338,8 @@ def main(args):
             print('Overlap All Reference Structure: %d' % n_sp_overlap)
             with open(
                     'data/power_of_%d/path_determination/%s_allref_structure_%d_%s_path%d.txt' % (
-                            save_prefix,
                             n_pos,
+                            save_prefix,
                             i_iter,
                             weighting_str,
                             i_path
@@ -353,7 +353,7 @@ def main(args):
             )
             plt.title('Overlap of states based on network structure\ntotal reference')
             if save_fig:
-                plt.savefig('figures/power_of_%d/%s_allref_venn_%d_path%d.png' % (save_prefix, n_pos, i_iter, i_path))
+                plt.savefig('figures/power_of_%d/%s_allref_venn_%d_path%d.png' % (n_pos, save_prefix, i_iter, i_path))
                 plt.close()
             else:
                 plt.show()
@@ -382,7 +382,7 @@ def main(args):
         cax = plt.axes([.87, 0.1, 0.03, 0.7])
         plt.colorbar(sm, cax=cax, orientation='vertical', label='weighting')
         if save_fig:
-            plt.savefig('figures/power_of_%d/%s_allref_structure_%d.png' % (save_prefix, n_pos, i_iter))
+            plt.savefig('figures/power_of_%d/%s_allref_structure_%d.png' % (n_pos, save_prefix, i_iter))
             plt.close()
         else:
             plt.show()
