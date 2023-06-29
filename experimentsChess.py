@@ -1,6 +1,7 @@
 import sys
 import os
 import multiprocessing
+from pathlib import Path
 from argparse import ArgumentParser
 
 
@@ -17,6 +18,7 @@ def main(args):
     beta_concentration = [1., 10., 100., 1000.]
     do_weight = [False, True]
 
+    Path('log').mkdir(exist_ok=True, parents=True)
     with multiprocessing.Pool(processes=n_cpus) as parallel:
         for np in npos:
             for bc in beta_concentration:
@@ -29,10 +31,12 @@ def main(args):
                         '--beta_concentration=%s '
                         '%s'
                         '--do_plot_network '
+                        '--save_prefix=%s '
                         '--save_fig  1> log/out_%s.out 2> log/err_%s.err' % (
                             np,
                             bc,
                             weight_string,
+                            save_string,
                             save_string,
                             save_string
                         ),
