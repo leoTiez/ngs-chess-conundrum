@@ -26,7 +26,7 @@ def parse_arguments(args):
                         help='Connection probability of Erdős–Rényi model.')
     parser.add_argument('--n_path', type=int, default=5,
                         help='Maximum number of considered paths. Increasing this will increase complexity of plots.')
-    parser.add_argument('--n_iter', type=int, default=100,
+    parser.add_argument('--n_iter', type=int, default=25,
                         help='Number of iterations over setup')
     parser.add_argument('--use_weighting', action='store_true', dest='use_weighting',
                         help='If set, weight paths based on how many nodes are in the guessed intermediate states')
@@ -34,6 +34,8 @@ def parse_arguments(args):
                         help='If set, plot network and their likely participating nodes based on RPM normalisation.')
     parser.add_argument('--use_kamada_kawai_layout', action='store_true', dest='use_kamada_kawai_layout',
                         help='If set, use kamada kawai layout for plotting instead of grid.')
+    parser.add_argument('--save_prefix', type=str, default='',
+                        help='Prefix that is added the saved data files.')
     parser.add_argument('--save_fig', action='store_true', dest='save_fig',
                         help='If set, save figures to file.')
 
@@ -88,6 +90,7 @@ def main(args):
     use_kamada_kawai_layout = args.use_kamada_kawai_layout
     use_weighting = args.use_weighting
     do_plot_network = args.do_plot_network
+    save_prefix = args.save_prefix
     save_fig = args.save_fig
     cmap = plt.get_cmap('gist_rainbow')
 
@@ -151,7 +154,7 @@ def main(args):
             fig.tight_layout()
             if save_fig:
                 Path('figures/power_of_%d' % n_pos).mkdir(exist_ok=True, parents=True)
-                plt.savefig('figures/power_of_%d/all_possible_nodes_weighted%d.png' % (n_pos, i_iter))
+                plt.savefig('figures/power_of_%d/%s_all_possible_nodes_weighted%d.png' % (save_prefix, n_pos, i_iter))
                 plt.close()
             else:
                 plt.show()
@@ -217,7 +220,7 @@ def main(args):
         fig.tight_layout()
         if save_fig:
             Path('figures/power_of_%d' % n_pos).mkdir(exist_ok=True, parents=True)
-            plt.savefig('figures/power_of_%d/naive_%d.png' % (n_pos, i_iter))
+            plt.savefig('figures/power_of_%d/%s_naive_%d.png' % (save_prefix, n_pos, i_iter))
             plt.close()
         else:
             plt.show()
@@ -227,7 +230,8 @@ def main(args):
         n_likely_nodes = len(likely_subgraph.nodes)
         n_node_overlap = len(set(likely_subgraph.nodes).intersection(path))
         Path('data/power_of_%d/path_determination' % n_pos).mkdir(exist_ok=True, parents=True)
-        with open('data/power_of_%d/path_determination/naive_%d.txt' % (n_pos, i_iter), 'w') as naive_file:
+        with open('data/power_of_%d/path_determination/%s_naive_%d.txt'
+                  % (save_prefix, n_pos, i_iter), 'w') as naive_file:
             naive_file.write('%d\n' % n_likely_nodes)
             naive_file.write('%d\n' % l_path)
             naive_file.write('%d\n' % n_node_overlap)
@@ -238,7 +242,7 @@ def main(args):
         )
         plt.title('Overlap of states based on data\nno total reference', fontsize=21)
         if save_fig:
-            plt.savefig('figures/power_of_%d/naive_venn_%d.png' % (n_pos, i_iter))
+            plt.savefig('figures/power_of_%d/%s_naive_venn_%d.png' % (save_prefix, n_pos, i_iter))
             plt.close()
         else:
             plt.show()
@@ -266,7 +270,8 @@ def main(args):
             n_lp_overlap = len(set(lp).intersection(path))
             print('Overlap No Reference Structure: %d' % n_lp_overlap)
             with open(
-                    'data/power_of_%d/path_determination/noref_structure_%d_%s_path%d.txt' % (
+                    'data/power_of_%d/path_determination/%s_noref_structure_%d_%s_path%d.txt' % (
+                            save_prefix,
                             n_pos,
                             i_iter,
                             weighting_str,
@@ -281,7 +286,7 @@ def main(args):
             )
             plt.title('Overlap of states based on network structure\nno total reference')
             if save_fig:
-                plt.savefig('figures/power_of_%d/noref_venn_%d_path%d.png' % (n_pos, i_iter, i_path))
+                plt.savefig('figures/power_of_%d/%s_noref_venn_%d_path%d.png' % (save_prefix, n_pos, i_iter, i_path))
                 plt.close()
             else:
                 plt.show()
@@ -306,7 +311,7 @@ def main(args):
         cax = plt.axes([.87, 0.1, 0.03, 0.7])
         plt.colorbar(sm, cax=cax, orientation='vertical', label='weighting')
         if save_fig:
-            plt.savefig('figures/power_of_%d/noref_structure_%d.png' % (n_pos, i_iter))
+            plt.savefig('figures/power_of_%d/%s_noref_structure_%d.png' % (save_prefix, n_pos, i_iter))
             plt.close()
         else:
             plt.show()
@@ -332,7 +337,8 @@ def main(args):
             n_sp_overlap = len(set(sp).intersection(path))
             print('Overlap All Reference Structure: %d' % n_sp_overlap)
             with open(
-                    'data/power_of_%d/path_determination/allref_structure_%d_%s_path%d.txt' % (
+                    'data/power_of_%d/path_determination/%s_allref_structure_%d_%s_path%d.txt' % (
+                            save_prefix,
                             n_pos,
                             i_iter,
                             weighting_str,
@@ -347,7 +353,7 @@ def main(args):
             )
             plt.title('Overlap of states based on network structure\ntotal reference')
             if save_fig:
-                plt.savefig('figures/power_of_%d/allref_venn_%d_path%d.png' % (n_pos, i_iter, i_path))
+                plt.savefig('figures/power_of_%d/%s_allref_venn_%d_path%d.png' % (save_prefix, n_pos, i_iter, i_path))
                 plt.close()
             else:
                 plt.show()
@@ -370,13 +376,13 @@ def main(args):
             node_color='tab:blue'
         )
         plot_edges(graph, node_pos, all_simple_paths, ax=plt.gca(), n_path=n_path, cmap=cmap)
-        plt.title('Connectivity based on most likely path\ntotal reference')
+        plt.title('Connectivity based on most likely path\ntotal reference', fontsize=32)
         plt.tight_layout()
         plt.subplots_adjust(right=.85)
         cax = plt.axes([.87, 0.1, 0.03, 0.7])
         plt.colorbar(sm, cax=cax, orientation='vertical', label='weighting')
         if save_fig:
-            plt.savefig('figures/power_of_%d/allref_structure_%d.png' % (n_pos, i_iter))
+            plt.savefig('figures/power_of_%d/%s_allref_structure_%d.png' % (save_prefix, n_pos, i_iter))
             plt.close()
         else:
             plt.show()
