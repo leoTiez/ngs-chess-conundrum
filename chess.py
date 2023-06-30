@@ -142,8 +142,8 @@ def main(args):
             fig.suptitle('RPM probability', fontsize=32)
             fig.tight_layout()
             if save_fig:
-                Path('figures/power_of_%d' % n_pos).mkdir(exist_ok=True, parents=True)
-                plt.savefig('figures/power_of_%d/%s_all_possible_nodes_weighted%d.png' % (n_pos, save_prefix, i_iter))
+                Path('figures/power_of_%d/chess_naive' % n_pos).mkdir(exist_ok=True, parents=True)
+                plt.savefig('figures/power_of_%d/chess_naive/%s_all_possible_nodes_weighted%d.png' % (n_pos, save_prefix, i_iter))
                 plt.close()
             else:
                 plt.show()
@@ -208,8 +208,8 @@ def main(args):
         fig.suptitle('Connectivity based on most likely nodes\nno total reference', fontsize=32)
         fig.tight_layout()
         if save_fig:
-            Path('figures/power_of_%d' % n_pos).mkdir(exist_ok=True, parents=True)
-            plt.savefig('figures/power_of_%d/%s_naive_%d.png' % (n_pos, save_prefix, i_iter))
+            Path('figures/power_of_%d/chess_naive' % n_pos).mkdir(exist_ok=True, parents=True)
+            plt.savefig('figures/power_of_%d/chess_naive/%s_naive_%d.png' % (n_pos, save_prefix, i_iter))
             plt.close()
         else:
             plt.show()
@@ -218,8 +218,8 @@ def main(args):
         likely_subgraph = graph.subgraph(idc_all)
         n_likely_nodes = len(likely_subgraph.nodes)
         n_node_overlap = len(set(likely_subgraph.nodes).intersection(path))
-        Path('data/power_of_%d/path_determination' % n_pos).mkdir(exist_ok=True, parents=True)
-        with open('data/power_of_%d/path_determination/%s_naive_%d.txt'
+        Path('data/power_of_%d/chess_naive/path_determination' % n_pos).mkdir(exist_ok=True, parents=True)
+        with open('data/power_of_%d/chess_naive/path_determination/%s_naive_%d.txt'
                   % (n_pos, save_prefix, i_iter), 'w') as naive_file:
             naive_file.write('%d\n' % n_likely_nodes)
             naive_file.write('%d\n' % l_path)
@@ -231,7 +231,7 @@ def main(args):
         )
         plt.title('Overlap of states based on data\nno total reference', fontsize=21)
         if save_fig:
-            plt.savefig('figures/power_of_%d/%s_naive_venn_%d.png' % (n_pos, save_prefix, i_iter))
+            plt.savefig('figures/power_of_%d/chess_naive/%s_naive_venn_%d.png' % (n_pos, save_prefix, i_iter))
             plt.close()
         else:
             plt.show()
@@ -261,7 +261,7 @@ def main(args):
             n_lp_overlap = len(set(lp).intersection(path))
             print('Overlap No Reference Structure: %d' % n_lp_overlap)
             with open(
-                    'data/power_of_%d/path_determination/%s_noref_structure_%d_%s_path%d.txt' % (
+                    'data/power_of_%d/chess_naive/path_determination/%s_noref_structure_%d_%s_path%d.txt' % (
                             n_pos,
                             save_prefix,
                             i_iter,
@@ -277,7 +277,7 @@ def main(args):
             )
             plt.title('Overlap of states based on network structure\nno total reference, path %d' % i_path)
             if save_fig:
-                plt.savefig('figures/power_of_%d/%s_noref_venn_%d_path%d.png' % (n_pos, save_prefix, i_iter, i_path))
+                plt.savefig('figures/power_of_%d/chess_naive/%s_noref_venn_%d_path%d.png' % (n_pos, save_prefix, i_iter, i_path))
                 plt.close()
             else:
                 plt.show()
@@ -302,7 +302,7 @@ def main(args):
         cax = plt.axes([.87, 0.1, 0.03, 0.7])
         plt.colorbar(sm, cax=cax, orientation='vertical', label='weighting')
         if save_fig:
-            plt.savefig('figures/power_of_%d/%s_noref_structure_%d.png' % (n_pos, save_prefix, i_iter))
+            plt.savefig('figures/power_of_%d/chess_naive/%s_noref_structure_%d.png' % (n_pos, save_prefix, i_iter))
             plt.close()
         else:
             plt.show()
@@ -331,7 +331,7 @@ def main(args):
             n_sp_overlap = len(set(sp).intersection(path))
             print('Overlap All Reference Structure: %d' % n_sp_overlap)
             with open(
-                    'data/power_of_%d/path_determination/%s_allref_structure_%d_%s_path%d.txt' % (
+                    'data/power_of_%d/chess_naive/path_determination/%s_allref_structure_%d_%s_path%d.txt' % (
                             n_pos,
                             save_prefix,
                             i_iter,
@@ -347,7 +347,7 @@ def main(args):
             )
             plt.title('Overlap of states based on network structure\ntotal reference, path %d' % i_path)
             if save_fig:
-                plt.savefig('figures/power_of_%d/%s_allref_venn_%d_path%d.png' % (n_pos, save_prefix, i_iter, i_path))
+                plt.savefig('figures/power_of_%d/chess_naive/%s_allref_venn_%d_path%d.png' % (n_pos, save_prefix, i_iter, i_path))
                 plt.close()
             else:
                 plt.show()
@@ -376,7 +376,7 @@ def main(args):
         cax = plt.axes([.87, 0.1, 0.03, 0.7])
         plt.colorbar(sm, cax=cax, orientation='vertical', label='weighting')
         if save_fig:
-            plt.savefig('figures/power_of_%d/%s_allref_structure_%d.png' % (n_pos, save_prefix, i_iter))
+            plt.savefig('figures/power_of_%d/chess_naive/%s_allref_structure_%d.png' % (n_pos, save_prefix, i_iter))
             plt.close()
         else:
             plt.show()
