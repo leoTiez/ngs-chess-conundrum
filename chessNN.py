@@ -1,7 +1,53 @@
+import sys
+from pathlib import Path
 import numpy as np
 import networkx as nx
-from utils import to_bitstring, create_sample
 import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
+from matplotlib.cm import ScalarMappable
+from matplotlib_venn import venn2
+from argparse import ArgumentParser
+
+from utils import create_sample
+
+
+def parse_arguments(args):
+    parser = ArgumentParser('Evaluation of the chess problem based on network structure without training.')
+    parser.add_argument('--n_pos', type=int, default=8,
+                        help='Number of positions in the bitstring. This determines number of possible states.')
+    parser.add_argument('--ns', type=int, default=2,
+                        help='Number of possible states per position. For bit string use 2 (ie 0 or 1).')
+    parser.add_argument('--sample_size', type=int, default=100,
+                        help='Number of sampled data points per sampled time point.')
+    parser.add_argument('--train_sample_size', type=int, default=100,
+                        help='Number of sampled data points drawn from sampled path during training.')
+    parser.add_argument('--cosine_bias', type=float, default=.15,
+                        help='The similarity between real data set and sampled data set during training is measured'
+                             'using the cosine similarity which is scaled between 0 and 1. Paths which produce similar '
+                             'data should be incentivised whereas all others should be discouraged. The cosine '
+                             'similarity is biased by this value to allow values larger than 1 for incentive.')
+    parser.add_argument('--beta_concentration', type=float, default=10.,
+                        help='Concentration (inverse of variance) of the sampled data points.')
+    parser.add_argument('--p_connect', type=float, default=.01,
+                        help='Connection probability of Erdős–Rényi model.')
+    parser.add_argument('--n_path', type=int, default=5,
+                        help='Maximum number of considered paths. Increasing this will increase complexity of plots.')
+    parser.add_argument('--n_epoch', type=int, default=10000,
+                        help='Number of epochs')
+    parser.add_argument('--eps_start', type=float, default=.9,
+                        help='Starting value of epsilon decline which implements exploration-exploitation trade-off')
+    parser.add_argument('--eps_end', type=float, default=.01,
+                        help='Ending value of epsilon decline which implements exploration-exploitation trade-off')
+    parser.add_argument('--eps_decline', type=float, default=2500.,
+                        help='Determines decline of epsilon function.')
+    parser.add_argument('--use_kamada_kawai_layout', action='store_true', dest='use_kamada_kawai_layout',
+                        help='If set, use kamada kawai layout for plotting instead of grid.')
+    parser.add_argument('--save_prefix', type=str, default='',
+                        help='Prefix that is added the saved data files.')
+    parser.add_argument('--save_fig', action='store_true', dest='save_fig',
+                        help='If set, save figures to file.')
+
+    return parser.parse_args(args)
 
 
 def path_sampler(graph):
@@ -19,31 +65,47 @@ def cosine_similarity(x, y):
     return (np.dot(x, y) / (norm_x * norm_y) + 1) / 2.
 
 
-def main():
+def sample_to_pair(i: int, n_states: int):
+    return i // n_states, i % n_states
+
+
+def main(args):
     def calc_eps(i):
         return eps_boundaries[1] + (eps_boundaries[0] - eps_boundaries[1]) * np.exp(- i / eps_boundaries[2])
-    n_pos = 10
-    ns = 2
-    n_states = ns ** n_pos
-    print('Number of possible states: %d' % n_states)
-    sample_size = 100
-    train_sample_size = 100
-    cosine_thresh = .25
-    # n_epoch = 100000
-    n_epoch = 50000
-    n_path = 5
+
+    n_pos = args.n_pos
+    ns = args.ns
+    sample_size = args.sample_size
+    train_sample_size = args.train_sample_size
+    cosine_bias = args.cosine_bias
+    n_epoch = args.n_epoch
+    n_path = args.n_path
+    beta_concent = args.beta_concentration
+    p_edge = args.p_connect
+    use_kamada_kawai_layout = args.use_kamada_kawai_layout
+    eps_boundaries = (args.eps_start, args.eps_end, args.eps_decline)
+    save_prefix = args.save_prefix
+    save_fig = args.save_fig
+    cmap = plt.get_cmap('gist_rainbow')
+    sm = ScalarMappable(norm=Normalize(vmin=0., vmax=1.), cmap=cmap)
+
     # Create sampling distributions
     beta_modes = np.array([.2, .5, .8])
-    beta_concent = 1
     alpha = 1. + beta_concent * beta_modes
     beta = 1. + beta_concent * (1 - beta_modes)
-    # eps_boundaries = (.8, 0.005, 30000)
-    eps_boundaries = (.9, 0.01, 12000)
     plt.plot(np.arange(n_epoch), calc_eps(np.arange(n_epoch)))
     plt.title('Epsilon during training')
-    plt.show()
+    plt.xlabel('Epoch')
+    plt.ylabel(r'$\epsilon$')
+    if save_fig:
+        Path('figures/power_of_%d/chessnn' % n_pos).mkdir(exist_ok=True, parents=True)
+        plt.savefig('figures/power_of_%d/chessnn/%s_epsilon.png' % (n_pos, save_prefix))
+        plt.close()
+    else:
+        plt.show()
 
-    p_edge = .01  # 1% connectivity
+    n_states = ns ** n_pos
+    print('Number of possible states: %d' % n_states)
     graph = nx.fast_gnp_random_graph(n=n_states, p=p_edge, directed=True)
 
     # create data
@@ -52,6 +114,7 @@ def main():
     idx = np.random.choice(len(sources))
     s, t = sources[idx], targets[idx]
     path = nx.dijkstra_path(graph, s, t)
+    l_path = len(path)
     print('Length path: %d' % len(path))
     print('Path', path)
     # Create data sample similar to sequencing
@@ -59,80 +122,123 @@ def main():
     data_sample2 = create_sample(alpha[1], beta[1], path, sample_size=sample_size, n_digits=n_pos)
     data_sample3 = create_sample(alpha[2], beta[2], path, sample_size=sample_size, n_digits=n_pos)
 
-    p_start = np.ones(n_states) / float(n_states)
-    p_end = np.ones(n_states) / float(n_states)
+    p = np.ones((n_states, n_states)) / float(n_states * n_states)
     for i_epoch in range(n_epoch):
         if i_epoch % 10 == 0:
             print('Epoch: %d' % i_epoch)
-            print('Most likely start %d' % np.argmax(p_start))
-            print('Most likely end %d' % np.argmax(p_end))
+            print('Most likely start %d' % np.argmax(np.max(p, axis=0)))
+            print('Most likely end %d' % np.argmax(np.max(p, axis=1)))
         eps = calc_eps(i_epoch)
         if eps < np.random.random():
-            ni = np.random.choice(n_states, p=p_start)
-            nj = np.random.choice(n_states, p=p_end)
+            n = np.random.choice(n_states * n_states, p=p.reshape(-1))
+            ni, nj = sample_to_pair(n, n_states)
         else:
-            ps_equal = (p_start != 0).astype('float')
-            pe_equal = (p_end != 0).astype('float')
-            ps_equal /= ps_equal.sum()
-            pe_equal /= pe_equal.sum()
-            ni = np.random.choice(n_states, p=ps_equal)
-            nj = np.random.choice(n_states, p=ps_equal)
+            p_equal = (p != 0).astype('float')
+            p_equal /= p_equal.sum()
+            n = np.random.choice(n_states * n_states, p=p_equal.reshape(-1))
+            ni, nj = sample_to_pair(n, n_states)
         try:
             train_path = nx.dijkstra_path(graph, ni, nj)
         except nx.exception.NetworkXNoPath:
-            p_start[ni] = 0.
-            p_end[nj] = 0.
-            p_start /= np.sum(p_start)
-            p_end /= np.sum(p_end)
+            p[ni, nj] = 0.
+            p /= np.sum(p)
             continue
         train_sample1 = create_sample(alpha[0], beta[0], train_path, sample_size=train_sample_size, n_digits=n_pos)
         train_sample2 = create_sample(alpha[1], beta[1], train_path, sample_size=train_sample_size, n_digits=n_pos)
         train_sample3 = create_sample(alpha[2], beta[2], train_path, sample_size=train_sample_size, n_digits=n_pos)
-        discount = cosine_similarity(train_sample1, data_sample1) * cosine_similarity(
-            train_sample2, data_sample2) * cosine_similarity(train_sample3, data_sample3)
-        p_start[ni] *= discount + cosine_thresh
-        p_end[nj] *= discount + cosine_thresh
 
+        discount_sample1 = cosine_similarity(train_sample1, data_sample1)
+        discount_sample2 = cosine_similarity(train_sample2, data_sample2)
+        discount_sample3 = cosine_similarity(train_sample3, data_sample3)
+        p[ni, nj] *= discount_sample1 * discount_sample2 * discount_sample3 + cosine_bias
+        # nodes within the path are slightly less important as start and end
+        train_path = np.asarray(train_path)
+        p[np.repeat(train_path[1:], len(train_path) - 1), np.tile(train_path[:-1], len(train_path) - 1)] = 0.
         # renormalise
-        p_start /= np.sum(p_start)
-        p_end /= np.sum(p_end)
+        p /= np.sum(p)
 
+    p_c = p.copy()
+    Path('data/power_of_%d/chessnn' % n_pos).mkdir(exist_ok=True, parents=True)
+    for i_path in range(n_path):
+        if np.all(p_c == 0):
+            break
+        ni, nj = sample_to_pair(np.argmax(p_c), n_states)
+        train_path = nx.dijkstra_path(graph, ni, nj)
+        n_sp_overlap = len(set(train_path).intersection(path))
+        print('Overlap All Reference Structure: %d' % n_sp_overlap)
+        with open(
+                'data/power_of_%d/chessnn/%s_path%d.txt' % (
+                        n_pos,
+                        save_prefix,
+                        i_path
+                ), 'w') as allref_structure_file:
+            allref_structure_file.write('%d\n' % len(train_path))
+            allref_structure_file.write('%d\n' % l_path)
+            allref_structure_file.write('%d\n' % n_sp_overlap)
+
+        venn2(
+            subsets=(len(train_path) - n_sp_overlap, l_path - n_sp_overlap, n_sp_overlap),
+            set_labels=('guessed states', 'real states'),
+        )
+        print('Statistical path length %d: %d' % (i_path, len(train_path)))
+        plt.title('Overlap of states based on statistics\npath number %s' % i_path)
+        if save_fig:
+            plt.savefig('figures/power_of_%d/chessnn/%s_ml_venn_path%d.png' % (n_pos, save_prefix, i_path))
+            plt.close()
+        else:
+            plt.show()
+
+        p_c[ni, nj] = 0.
+
+    if use_kamada_kawai_layout:
+        node_pos = nx.kamada_kawai_layout(graph, weight=2)
+    else:
+        sqrt_n = np.sqrt(n_states)
+        node_pos = {i: np.array([i // sqrt_n, i % sqrt_n]) for i in graph.nodes}
     plt.figure(figsize=(18, 7))
-    sqrt_n = np.sqrt(n_states)
-    node_pos = {i: np.array([i // sqrt_n, i % sqrt_n]) for i in graph.nodes}
     nx.draw_networkx_nodes(
         graph,
         pos=node_pos,
         nodelist=graph.nodes,
         node_color='white',
-        edgecolors='black'
+        edgecolors='black',
     )
     nx.draw_networkx_nodes(
         graph,
         pos=node_pos,
         nodelist=path,
-        node_color='tab:blue'
+        node_color='tab:blue',
     )
-    for i_path, c in enumerate(['red', 'black', 'orange', 'purple', 'green']):
+
+    for i_path in range(n_path):
+        if np.all(p == 0):
+            break
         scale = (n_path - i_path) / float(n_path)
-        ni = np.argmax(p_start)
-        nj = np.argmax(p_end)
+        ni, nj = sample_to_pair(np.argmax(p), n_states)
         train_path = nx.dijkstra_path(graph, ni, nj)
-        print('Path length %d: %d' % (i_path, len(train_path)))
+        print('Statistical path length %d: %d' % (i_path, len(train_path)))
         edgelist = list(zip(train_path[:-1], train_path[1:]))
+        c = cmap(scale)
         nx.draw_networkx_edges(
             graph,
             node_pos,
             edgelist=edgelist,
-            width=2. * scale,
-            edge_color=c
+            width=(2. * scale)**2,
+            edge_color=c,
         )
-        p_start[ni] = 0.
-        p_end[nj] = 0.
+        p[ni, nj] = 0.
 
-    plt.show()
+    plt.subplots_adjust(right=.85)
+    cax = plt.axes([.87, 0.1, 0.03, 0.7])
+    plt.colorbar(sm, cax=cax, orientation='vertical', label='weighting')
+
+    if save_fig:
+        plt.savefig('figures/chessnn/%s_nnpaths.png' % save_prefix)
+        plt.close()
+    else:
+        plt.show()
 
 
 if __name__ == '__main__':
-    main()
+    main(parse_arguments(sys.argv[1:]))
 
