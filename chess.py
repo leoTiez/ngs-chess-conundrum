@@ -42,20 +42,9 @@ def parse_arguments(args):
     return parser.parse_args(args)
 
 
-def determine_paths(graph: nx.Graph, source_list: List[int], target_list: List[int], min_length: int = 3):
-    paths_list = []
-    for s in source_list:
-        for t in target_list:
-            # Catch if no path existent
-            try:
-                prob_path = nx.dijkstra_path(graph, source=s, target=t)
-                if len(prob_path) < min_length:
-                    continue
-                paths_list.append(prob_path)
-            except nx.exception.NetworkXNoPath:
-                continue
-
-    return paths_list
+def determine_paths(graph: nx.Graph):
+    path_list = nx.all_pairs_shortest_path(graph)
+    return path_list
 
 
 def plot_edges(
@@ -74,7 +63,7 @@ def plot_edges(
             graph,
             node_pos,
             edgelist=simple_edgelist,
-            width=3 * scale,
+            width=(2 * scale)**2,
             edge_color=c,
             ax=ax
         )
@@ -237,7 +226,7 @@ def main(args):
             naive_file.write('%d\n' % n_node_overlap)
 
         venn2(
-            subsets=(n_likely_nodes, l_path, n_node_overlap),
+            subsets=(n_likely_nodes - n_node_overlap, l_path - n_node_overlap, n_node_overlap),
             set_labels=('guessed states', 'real states')
         )
         plt.title('Overlap of states based on data\nno total reference', fontsize=21)
@@ -252,7 +241,9 @@ def main(args):
         idc2, = np.where(scaling2 > .9)
         idc3, = np.where(scaling3 > .9)
         idc_all = np.unique(np.concatenate([idc1, idc2, idc3]).reshape(-1))
-        likely_paths = determine_paths(graph, idc1, idc3)
+        likely_paths = determine_paths(graph)
+        likely_paths = [ni_dict[nj] for ni, ni_dict in likely_paths
+                        for nj in ni_dict.keys() if np.any(ni == idc1) and np.any(nj == idc3) and ni != nj]
         if use_weighting:
             weighting = calc_weights(idc2)
             sort_fun = lambda x_list: np.sum(np.isin(np.unique(idc2.reshape(-1)), x_list).astype('float')
@@ -281,10 +272,10 @@ def main(args):
                 noref_structure_file.write('%d\n' % l_path)
                 noref_structure_file.write('%d\n' % n_lp_overlap)
             venn2(
-                subsets=(len(lp), l_path, n_lp_overlap),
+                subsets=(len(lp) - n_lp_overlap, l_path - n_lp_overlap, n_lp_overlap),
                 set_labels=('guessed states', 'real states')
             )
-            plt.title('Overlap of states based on network structure\nno total reference')
+            plt.title('Overlap of states based on network structure\nno total reference, path %d' % i_path)
             if save_fig:
                 plt.savefig('figures/power_of_%d/%s_noref_venn_%d_path%d.png' % (n_pos, save_prefix, i_iter, i_path))
                 plt.close()
@@ -319,7 +310,10 @@ def main(args):
         possible_state1 = to_int(decompose_states(data_sample1, sample_size))
         possible_state2 = to_int(decompose_states(data_sample2, sample_size))
         possible_state3 = to_int(decompose_states(data_sample3, sample_size))
-        all_simple_paths = determine_paths(graph, possible_state1.reshape(-1), possible_state3.reshape(-1))
+        all_simple_paths = determine_paths(graph)
+        all_simple_paths = [ni_dict[nj] for ni, ni_dict in all_simple_paths for nj in ni_dict.keys()
+                            if np.any(ni == possible_state1.reshape(-1)) and np.any(nj == possible_state3.reshape(-1))
+                            and ni != nj]
         if use_weighting:
             weighting = calc_weights(possible_state2)
             sort_fun = lambda x_list: np.sum(np.isin(np.unique(possible_state2.reshape(-1)), x_list).astype('float')
@@ -348,10 +342,10 @@ def main(args):
                 allref_structure_file.write('%d\n' % l_path)
                 allref_structure_file.write('%d\n' % n_sp_overlap)
             venn2(
-                subsets=(len(sp), l_path, n_sp_overlap),
+                subsets=(len(sp) - n_sp_overlap, l_path - n_sp_overlap, n_sp_overlap),
                 set_labels=('guessed states', 'real states')
             )
-            plt.title('Overlap of states based on network structure\ntotal reference')
+            plt.title('Overlap of states based on network structure\ntotal reference, path %d' % i_path)
             if save_fig:
                 plt.savefig('figures/power_of_%d/%s_allref_venn_%d_path%d.png' % (n_pos, save_prefix, i_iter, i_path))
                 plt.close()
