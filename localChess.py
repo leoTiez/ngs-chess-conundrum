@@ -55,7 +55,7 @@ class RF:
             eps_end=.05,
             eps_decay=1000,
             tau=0.1,
-            lr=5e-5,
+            lr=1e-5,
             device=torch.device('cpu')
     ):
         self.n_obs = n_obs
@@ -105,9 +105,9 @@ class RF:
                                                 batch.next_state)), device=self.device, dtype=torch.bool)
         non_final_next_states = torch.cat([s for s in batch.next_state
                                            if s is not None]).reshape(self.batch_size, self.n_obs)
-        state_batch = torch.cat(batch.state).reshape(-1, self.n_obs)
-        action_batch = torch.stack(batch.action)
-        reward_batch = torch.stack(batch.reward)
+        state_batch = torch.cat(batch.state).reshape(-1, self.n_obs).to(self.device)
+        action_batch = torch.stack(batch.action).to(self.device)
+        reward_batch = torch.stack(batch.reward).to(self.device)
 
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
@@ -224,23 +224,24 @@ def main():
     n_epochs = 50
     batch_size = 100
     tp_idc = torch.tensor([250, 700, 1150])
-    device = torch.device('cpu')
+    device = torch.device('cuda')
     data = torch.tensor(np.loadtxt('data/sampled_paths/data.csv')).to(device)
     rf = RF(n_obs=data.shape[1], batch_size=batch_size, device=device)
     for i_epoch in range(n_epochs):
         total_reward = []
-        state = torch.zeros((batch_size, data.shape[1]))
-        prev_state = torch.zeros((batch_size, data.shape[1]))
+        state = torch.zeros((batch_size, data.shape[1])).to(device)
+        prev_state = torch.zeros((batch_size, data.shape[1])).to(device)
         for i_time in range(tp_idc.max() + 1):
             print_progress(i_time / float(tp_idc.max()), prefix='Forward progress', length=50)
             if torch.isin(i_time, tp_idc):
                 pred_data = torch.sum(state, dim=0)
                 reward = torch.exp(-torch.mean(torch.pow((data[tp_idc] / torch.max(data[tp_idc])
-                                                - pred_data / torch.max(pred_data)), 2))) * torch.ones(batch_size)
+                                                - pred_data / torch.max(pred_data)), 2))) * torch.ones(batch_size).to(device)
                 prev_state[:] = state[:]
-                print('\t\tReward %.6f' % reward[-1])
+                with torch.no_grad():
+                    print('\t\tReward %.6f' % reward.cpu().detach().numpy()[-1])
             else:
-                reward = torch.zeros(batch_size)
+                reward = torch.zeros(batch_size).to(device)
 
             action = rf.select_action(i_time, state)
             for i_state, i_action in enumerate(action):
@@ -249,10 +250,10 @@ def main():
             rf.train_step()
             rf.update_qdn()
             with torch.no_grad():
-                total_reward.append(reward[-1].detach().numpy())
+                total_reward.append(reward[-1].cpu().detach().numpy())
         with torch.no_grad():
             print('\nIter %d | Reward %.6f' % (i_epoch, np.sum(np.asarray(total_reward))))
-            print('Average action probabilities', rf.qdn_target.sample(state).detach().numpy(), '\n')
+            print('Average action probabilities', rf.qdn_target.sample(state).cpu().detach().numpy(), '\n')
 
 
 if __name__ == '__main__':
