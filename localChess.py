@@ -221,7 +221,8 @@ def main():
     do_create_data = False
     if do_create_data:
         create_data()
-    n_epochs = 50
+    verbosity = 3
+    n_epochs = 1000
     batch_size = 100
     tp_idc = torch.tensor([250, 700, 1150])
     device = torch.device('cuda')
@@ -232,14 +233,17 @@ def main():
         state = torch.zeros((batch_size, data.shape[1])).to(device)
         prev_state = torch.zeros((batch_size, data.shape[1])).to(device)
         for i_time in range(tp_idc.max() + 1):
-            print_progress(i_time / float(tp_idc.max()), prefix='Forward progress', length=50)
+            if verbosity > 2:
+                print_progress(i_time / float(tp_idc.max()), prefix='Forward progress', length=50)
             if torch.isin(i_time, tp_idc):
                 pred_data = torch.sum(state, dim=0)
-                reward = torch.exp(-torch.mean(torch.pow((data[tp_idc] / torch.max(data[tp_idc])
-                                                - pred_data / torch.max(pred_data)), 2))) * torch.ones(batch_size).to(device)
+                reward = torch.exp(-torch.mean(
+                    torch.pow((data[tp_idc] / torch.max(data[tp_idc]) - pred_data / torch.max(pred_data)), 2)
+                )) * torch.ones(batch_size).to(device)
                 prev_state[:] = state[:]
                 with torch.no_grad():
-                    print('\t\tReward %.6f' % reward.cpu().detach().numpy()[-1])
+                    if verbosity > 1:
+                        print('\t\tReward %.6f' % reward.cpu().detach().numpy()[-1])
             else:
                 reward = torch.zeros(batch_size).to(device)
 
@@ -252,8 +256,9 @@ def main():
             with torch.no_grad():
                 total_reward.append(reward[-1].cpu().detach().numpy())
         with torch.no_grad():
-            print('\nIter %d | Reward %.6f' % (i_epoch, np.sum(np.asarray(total_reward))))
-            print('Average action probabilities', rf.qdn_target.sample(state).cpu().detach().numpy(), '\n')
+            if verbosity > 0:
+                print('\nIter %d | Reward %.6f' % (i_epoch, np.sum(np.asarray(total_reward))))
+                print('Average action probabilities', rf.qdn_target.sample(state).cpu().detach().numpy(), '\n')
 
 
 if __name__ == '__main__':
