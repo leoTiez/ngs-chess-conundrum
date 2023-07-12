@@ -53,7 +53,7 @@ class RF:
             gamma=0.99,
             eps_start=.9,
             eps_end=.05,
-            eps_decay=1000,
+            eps_decay=100,
             tau=0.1,
             lr=1e-5,
             device=torch.device('cpu')
@@ -247,7 +247,7 @@ def main():
             else:
                 reward = torch.zeros(batch_size).to(device)
 
-            action = rf.select_action(i_time, state)
+            action = rf.select_action(i_epoch, state)
             for i_state, i_action in enumerate(action):
                 state[i_state] = list(TRANSITIONS.keys())[i_action](state[i_state])
             rf.memory.push(prev_state, action, state, reward)
