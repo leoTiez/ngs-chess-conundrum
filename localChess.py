@@ -55,7 +55,7 @@ class RF:
             eps_end=.05,
             eps_decay=1000,
             tau=0.1,
-            lr=1e-5,
+            lr=5e-5,
             device=torch.device('cpu')
     ):
         self.n_obs = n_obs
@@ -224,11 +224,11 @@ def main():
     n_epochs = 50
     batch_size = 100
     tp_idc = torch.tensor([250, 700, 1150])
-    data = torch.tensor(np.loadtxt('data/sampled_paths/data.csv'))
-    rf = RF(n_obs=data.shape[1], batch_size=batch_size)
+    device = torch.device('cpu')
+    data = torch.tensor(np.loadtxt('data/sampled_paths/data.csv')).to(device)
+    rf = RF(n_obs=data.shape[1], batch_size=batch_size, device=device)
     for i_epoch in range(n_epochs):
         total_reward = []
-        update_strategy = False
         state = torch.zeros((batch_size, data.shape[1]))
         prev_state = torch.zeros((batch_size, data.shape[1]))
         for i_time in range(tp_idc.max() + 1):
