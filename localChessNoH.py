@@ -6,10 +6,16 @@ from pathlib import Path
 from collections import namedtuple, deque
 import random
 from matplotlib.colors import Normalize
-
+import imageio
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
+
+
+def get_img(fig):
+    graph = np.frombuffer(fig.canvas.tostring_rgb(), dtype='uint8')
+    graph = graph.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    return graph
 
 
 class ReplayMemory(object):
@@ -220,8 +226,9 @@ def create_data():
 
 def main():
     verbosity = 3
-    n_epochs = 1000
+    n_epochs = 500
     batch_size = 100
+    save_fig = True
     tp_idc = torch.tensor([250, 700, 1050])
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     data = torch.tensor(np.loadtxt('data/sampled_paths/dataNoH.csv')).to(device)
@@ -234,8 +241,15 @@ def main():
     plt.ion()
     fig_pred, ax_pred = plt.subplots(1, 1)
     fig_reward, ax_reward = plt.subplots(1, 1)
+    fig_diff, ax_diff = plt.subplots(1, 1)
+
     reward_line = ax_reward.plot([0])[0]
     avg_reward_line = ax_reward.plot([0], linestyle='--')[0]
+    diff_rects = ax_diff.bar(np.arange(len(TRANSITIONS)), np.zeros(len(TRANSITIONS)), width=.25, label='Difference')
+    abs_rects = ax_diff.bar(np.arange(len(TRANSITIONS)) + .25, np.zeros(len(TRANSITIONS)), width=.25, label='Absolute')
+    ax_diff.legend()
+
+    fig_list_pred, fig_list_reward, fig_list_diff = [], [], []
     reward_list = []
     moving_avg_reward = []
     for i_epoch in range(n_epochs):
@@ -272,8 +286,9 @@ def main():
             else:
                 moving_avg_reward.append(reward_list[-1])
             if verbosity > 0:
+                trained_probabilities = rf.qdn_target.sample(state).cpu().detach().numpy()
                 print('\nIter %d | Reward %.6f' % (i_epoch, np.sum(np.asarray(total_reward))))
-                print('Average action probabilities', rf.qdn_target.sample(state).cpu().detach().numpy(), '\n')
+                print('Average action probabilities', trained_probabilities, '\n')
                 reward_line.set_ydata(reward_list)
                 reward_line.set_xdata(np.arange(len(reward_list)))
                 avg_reward_line.set_ydata(moving_avg_reward)
@@ -286,6 +301,20 @@ def main():
                     cmap='seismic',
                     norm=Normalize(vmin=-data.max(), vmax=data.max())
                 )
+                for drect, arect, real_theta, trained_theta in zip(
+                        diff_rects,
+                        abs_rects,
+                        TRANSITIONS.values(),
+                        trained_probabilities
+                ):
+                    drect.set_height(trained_theta - real_theta)
+                    arect.set_height(trained_theta)
+                rect_ylim = np.max(np.maximum(
+                    trained_probabilities,
+                    np.array(list(TRANSITIONS.values()))
+                ))
+                ax_diff.set_ylim((-rect_ylim, rect_ylim))
+                ax_diff.set_title('No H | Difference between trained theta and real theta')
                 ax_pred.set_title('No H | Difference between predicted data and real data\nEpoch %d' % i_epoch)
                 ax_reward.set_title('No H | Reward\nEpoch %d' % i_epoch)
                 fig_pred.tight_layout()
@@ -294,9 +323,24 @@ def main():
                 fig_reward.tight_layout()
                 fig_reward.canvas.draw()
                 fig_reward.canvas.flush_events()
+                fig_diff.tight_layout()
+                fig_diff.canvas.draw()
+                fig_diff.canvas.flush_events()
+
+                fig_list_pred.append(get_img(fig_pred))
+                fig_list_reward.append(get_img(fig_reward))
+                fig_list_diff.append(get_img(fig_diff))
+
+    if save_fig:
+        Path('figures/training').mkdir(parents=True, exist_ok=True)
+        imageio.mimsave('figures/training/NoH_pred.gif', fig_list_pred, fps=10)
+        imageio.mimsave('figures/training/NoH_reward.gif', fig_list_reward, fps=10)
+        imageio.mimsave('figures/training/NoH_diff.gif', fig_list_diff, fps=10)
+        plt.close('all')
 
 
 if __name__ == '__main__':
+    torch.set_num_threads(1)
     do_create_data = False
     if do_create_data:
         create_data()
