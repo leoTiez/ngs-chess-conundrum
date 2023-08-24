@@ -13,7 +13,6 @@ Transition = namedtuple('Transition',
 
 
 class ReplayMemory(object):
-
     def __init__(self, capacity=10000):
         self.memory = deque([], maxlen=capacity)
 
@@ -32,13 +31,13 @@ class ReplayMemory(object):
 
 
 class DQN(nn.Module):
-
-    def __init__(self, n_observations, n_actions=4, init_mean=.0, init_std=.1):
+    def __init__(self, n_observations, n_actions=4, init_mean=-1., init_std=.1):
         super(DQN, self).__init__()
-        layer1 = nn.Linear(n_observations + 1, 128)
-        layer2 = nn.Linear(128, 64)
-        layer3 = nn.Linear(64, n_actions)
-        self.nn = nn.Sequential(layer1, nn.ReLU(), layer2, nn.ReLU(), layer3, nn.ReLU())
+        layer1 = nn.Linear(n_observations, 8)
+        layer2 = nn.Linear(8, 8)
+        layer3 = nn.Linear(8, n_actions)
+        # Rescale to something between 0 and 1 in last layer
+        self.nn = nn.Sequential(layer1, nn.ReLU(), layer2, nn.Sigmoid(), layer3, nn.Sigmoid())
         self._init_weights(init_mean, init_std)
 
     def _init_weights(self, mean, std):
@@ -47,13 +46,11 @@ class DQN(nn.Module):
                 layer.weight.data.normal_(mean, std)
                 layer.bias.data.fill_(0.01)
 
-    def forward(self, x, t):
-        if not isinstance(t, torch.Tensor) or len(t.shape) < 1:
-            t_vec = torch.ones((x.shape[0], 1)) * t
-        else:
-            t_vec = t.clone().reshape((x.shape[0], 1))
-        x_ = torch.hstack([x, t_vec])
-        return self.nn(x_)
+    def forward(self, x):
+        return self.nn(x)
+
+    def predict(self, x):
+        return torch.mean(self.nn(x), dim=0)
 
 
 class RF:
@@ -88,17 +85,18 @@ class RF:
     def calc_eps(self, i_iter):
         return self.eps_end + (self.eps_start - self.eps_end) * torch.exp(- torch.tensor(i_iter / self.eps_decay))
 
-    def select_action(self, i_iter, state, t):
+    def select_action(self, i_iter, state):
         sample = torch.rand(state.shape[0])
         eps_threshold = self.calc_eps(i_iter)
         with torch.no_grad():
-            a_mu = self.qdn_policy(state, t)
-            a_0 = torch.sum(a_mu, dim=1)
+            theta_mu = self.qdn_policy.predict(state)
+            a_mu = calc_a(state, theta=theta_mu)
+            a_0 = torch.sum(a_mu)
             r1, r2 = torch.rand(size=(2, state.shape[0]))
             # Update t
             tau = (1. / a_0) * torch.log(1. / r1)
             # Update state
-            mu = torch.searchsorted(torch.cumsum(a_mu, dim=1), (a_0 * r2).reshape(-1, 1)).reshape(-1).type(torch.long)
+            mu = torch.searchsorted(torch.cumsum(a_mu, dim=0), (a_0 * r2).reshape(-1, 1)).reshape(-1).type(torch.long)
 
             random_mask = torch.logical_or(a_0 == 0, sample <= eps_threshold)
             mu[random_mask] = torch.tensor(
@@ -128,7 +126,7 @@ class RF:
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
-        state_action_values = self.qdn_policy(state_batch, t_time).gather(1, action_batch.reshape(-1, 1)).reshape(-1)
+        state_action_values = self.qdn_policy(state_batch).gather(1, action_batch.reshape(-1, 1)).reshape(-1)
 
         # Compute V(s_{t+1}) for all next states.
         # Expected values of actions for non_final_next_states are computed based
@@ -137,7 +135,7 @@ class RF:
         # state value or 0 in case the state was final.
         next_state_values = torch.zeros(self.batch_size, device=self.device)
         with torch.no_grad():
-            next_state_values[non_final_mask] = self.qdn_target(non_final_next_states, nt_time).max(1)[0]
+            next_state_values[non_final_mask] = self.qdn_target(non_final_next_states).max(1)[0]
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.gamma) + reward_batch
 
@@ -213,10 +211,14 @@ TRANSITIONS = {
 }
 
 
-def calc_a(current_state):
+def calc_a(current_state, theta=None):
     a_mu = torch.zeros(len(TRANSITIONS))
     for mu, (fun, c) in enumerate(TRANSITIONS.items()):
-        a_mu[mu] = fun(current_state, do_determine_interact=True) * c
+        if theta is None:
+            prob = c
+        else:
+            prob = theta[mu]
+        a_mu[mu] = fun(current_state, do_determine_interact=True) * prob
     return a_mu
 
 
@@ -262,7 +264,7 @@ def create_data():
     plt.imshow(data, aspect='auto')
     plt.show()
     Path('data/sampled_paths').mkdir(exist_ok=True, parents=True)
-    np.savetxt('data/sampled_paths/data.csv', data.detach().numpy())
+    np.savetxt('data/sampled_paths/dataH.csv', data.detach().numpy())
 
 
 def main():
@@ -272,14 +274,14 @@ def main():
     sim_time = 120.
     sample_time = [5., 30., 60., 120.]
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    data = torch.tensor(np.loadtxt('data/sampled_paths/data.csv')).to(device)
+    data = torch.tensor(np.loadtxt('data/sampled_paths/dataH.csv')).to(device)
     rf = RF(
         n_act=len(TRANSITIONS),
         n_obs=data.shape[1],
         batch_size=batch_size,
         device=device,
         eps_start=0.05,
-        lr=1e-5
+        lr=1e-3
     )
     plt.ion()
     fig_pred, ax_pred = plt.subplots(1, 1)
@@ -299,7 +301,7 @@ def main():
             if verbosity > 2:
                 print_progress(t / sim_time, prefix='Forward progress', length=50)
             prior_t = t.clone()
-            action, tau = rf.select_action(i_epoch, state, t)
+            action, tau = rf.select_action(i_epoch, state)
             # Use minimum tau in early epochs to make sure enough steps are sampled
             t += torch.mean(tau)
             for i_state, i_action in enumerate(action):
@@ -317,7 +319,7 @@ def main():
                 with torch.no_grad():
                     total_reward.append(torch.mean(reward).cpu().detach().numpy())
                     if verbosity > 1:
-                        print('\t\tReward %.6f' % reward.cpu().detach().numpy()[-1])
+                        print('\t\tReward %.6f' % torch.mean(reward).cpu().detach().numpy())
 
         rf.update_qdn()
         with torch.no_grad():
@@ -328,6 +330,7 @@ def main():
                 moving_avg_reward.append(reward_list[-1])
             if verbosity > 0:
                 print('\nIter %d | Reward %.6f | Epsilon %.3f' % (i_epoch, reward_list[-1], rf.calc_eps(i_epoch)))
+                print('Learnt theta: ', rf.qdn_policy.predict(state))
                 reward_line.set_ydata(reward_list)
                 reward_line.set_xdata(np.arange(len(reward_list)))
                 avg_reward_line.set_ydata(moving_avg_reward)
@@ -340,8 +343,8 @@ def main():
                     cmap='seismic',
                     norm=Normalize(vmin=-data.max(), vmax=data.max())
                 )
-                ax_pred.set_title('Difference between predicted data and real data\nEpoch %d' % i_epoch)
-                ax_reward.set_title('Reward\nEpoch %d' % i_epoch)
+                ax_pred.set_title('H | Difference between predicted data and real data\nEpoch %d' % i_epoch)
+                ax_reward.set_title('H | Reward\nEpoch %d' % i_epoch)
                 fig_pred.tight_layout()
                 fig_pred.canvas.draw()
                 fig_pred.canvas.flush_events()
