@@ -8,7 +8,7 @@ from matplotlib.cm import ScalarMappable
 from matplotlib_venn import venn2
 from argparse import ArgumentParser
 
-from utils import create_sample
+from utils import create_sample, create_network, determine_shortest_longest_path
 
 
 def parse_arguments(args):
@@ -106,14 +106,10 @@ def main(args):
 
     n_states = ns ** n_pos
     print('Number of possible states: %d' % n_states)
-    graph = nx.fast_gnp_random_graph(n=n_states, p=p_edge, directed=True)
+    graph = create_network(n_states, p_edge)
 
     # create data
-    path_dist = nx.floyd_warshall_numpy(graph)
-    sources, targets = np.where(path_dist == path_dist[~np.isinf(path_dist)].max())
-    idx = np.random.choice(len(sources))
-    s, t = sources[idx], targets[idx]
-    path = nx.dijkstra_path(graph, s, t)
+    path, path_dist = determine_shortest_longest_path(graph)
     l_path = len(path)
     print('Length path: %d' % len(path))
     print('Path', path)
@@ -122,7 +118,9 @@ def main(args):
     data_sample2 = create_sample(alpha[1], beta[1], path, sample_size=sample_size, n_digits=n_pos)
     data_sample3 = create_sample(alpha[2], beta[2], path, sample_size=sample_size, n_digits=n_pos)
 
-    p = np.ones((n_states, n_states)) / float(n_states * n_states)
+    p = np.ones((n_states, n_states))
+    p[np.isinf(path_dist)] = 0.
+    p /= np.sum(p)
     for i_epoch in range(n_epoch):
         if i_epoch % 10 == 0:
             print('Epoch: %d' % i_epoch)
@@ -151,7 +149,7 @@ def main(args):
         discount_sample2 = cosine_similarity(train_sample2, data_sample2)
         discount_sample3 = cosine_similarity(train_sample3, data_sample3)
         p[ni, nj] *= discount_sample1 * discount_sample2 * discount_sample3 + cosine_bias
-        # nodes within the path are slightly less important as start and end
+        # nodes within the path aren't important as we aim to find the entire path
         train_path = np.asarray(train_path)
         p[np.repeat(train_path[1:], len(train_path) - 1), np.tile(train_path[:-1], len(train_path) - 1)] = 0.
         # renormalise
