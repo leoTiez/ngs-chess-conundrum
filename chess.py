@@ -9,7 +9,7 @@ from matplotlib.colors import Colormap, Normalize
 from matplotlib.cm import ScalarMappable
 from matplotlib_venn import venn2
 
-from utils import to_bitstring, create_sample, to_int, decompose_states, calc_weights
+from utils import to_bitstring, create_sample, to_int, decompose_states, calc_weights, create_network, determine_shortest_longest_path
 
 
 def parse_arguments(args):
@@ -99,14 +99,9 @@ def main(args):
     for i_iter in range(n_iter):
         print('Iteration %d' % i_iter)
         # Create graph
-        graph = nx.fast_gnp_random_graph(n=n_states, p=p_edge, directed=True)
+        graph = create_network(n_states, p_edge)
         # Determine paths
-        path_dist = nx.floyd_warshall_numpy(graph)
-        # Take longest shortest path
-        sources, targets = np.where(path_dist == path_dist[~np.isinf(path_dist)].max())
-        idx = np.random.choice(len(sources))
-        s, t = sources[idx], targets[idx]
-        path = nx.dijkstra_path(graph, s, t)
+        path, _ = determine_shortest_longest_path(graph)
         l_path = len(path)
         print('Length path: %d' % l_path)
         print('Path', path)
@@ -116,11 +111,10 @@ def main(args):
         data_sample2 = create_sample(alpha[1], beta[1], path, sample_size=sample_size, n_digits=n_pos)
         data_sample3 = create_sample(alpha[2], beta[2], path, sample_size=sample_size, n_digits=n_pos)
 
-        # Define scaling equivalent to reads per million
+        # Scaling with interpretation based on presence
         scaling1 = np.sum(data_sample1.reshape(1, -1) * lookup / np.sum(data_sample1).astype('float'), axis=1)
         scaling2 = np.sum(data_sample2.reshape(1, -1) * lookup / np.sum(data_sample2).astype('float'), axis=1)
         scaling3 = np.sum(data_sample3.reshape(1, -1) * lookup / np.sum(data_sample3).astype('float'), axis=1)
-
         scaling1 = scaling1 / np.max(scaling1).astype('float')
         scaling2 = scaling2 / np.max(scaling2).astype('float')
         scaling3 = scaling3 / np.max(scaling3).astype('float')
@@ -154,6 +148,28 @@ def main(args):
         idc2, = np.where(scaling2 > .75)
         idc3, = np.where(scaling3 > .75)
         idc_all = np.unique(np.concatenate([idc1, idc2, idc3]).reshape(-1))
+
+        # Check whether necessary nodes are in subgraph
+        likely_subgraph = graph.subgraph(idc_all)
+        n_likely_nodes = len(likely_subgraph.nodes)
+        n_node_overlap = len(set(likely_subgraph.nodes).intersection(path))
+        Path('data/power_of_%d/chess_naive/path_determination' % n_pos).mkdir(exist_ok=True, parents=True)
+        with open('data/power_of_%d/chess_naive/path_determination/%s_naive_%d.txt'
+                  % (n_pos, save_prefix, i_iter), 'w') as naive_file:
+            naive_file.write('%d\n' % n_likely_nodes)
+            naive_file.write('%d\n' % l_path)
+            naive_file.write('%d\n' % n_node_overlap)
+
+        venn2(
+            subsets=(n_likely_nodes - n_node_overlap, l_path - n_node_overlap, n_node_overlap),
+            set_labels=('guessed states', 'real states')
+        )
+        plt.title('Overlap of states based on most likely nodes\nno total reference', fontsize=21)
+        if save_fig:
+            plt.savefig('figures/power_of_%d/chess_naive/%s_naive_venn_%d.png' % (n_pos, save_prefix, i_iter))
+            plt.close()
+        else:
+            plt.show()
 
         # Determine paths that are included in subgraph of most likely time points
         fig, ax = plt.subplots(1, 3, figsize=(18, 6))
@@ -210,28 +226,6 @@ def main(args):
         if save_fig:
             Path('figures/power_of_%d/chess_naive' % n_pos).mkdir(exist_ok=True, parents=True)
             plt.savefig('figures/power_of_%d/chess_naive/%s_naive_%d.png' % (n_pos, save_prefix, i_iter))
-            plt.close()
-        else:
-            plt.show()
-
-        # Check whether necessary nodes are in subgraph
-        likely_subgraph = graph.subgraph(idc_all)
-        n_likely_nodes = len(likely_subgraph.nodes)
-        n_node_overlap = len(set(likely_subgraph.nodes).intersection(path))
-        Path('data/power_of_%d/chess_naive/path_determination' % n_pos).mkdir(exist_ok=True, parents=True)
-        with open('data/power_of_%d/chess_naive/path_determination/%s_naive_%d.txt'
-                  % (n_pos, save_prefix, i_iter), 'w') as naive_file:
-            naive_file.write('%d\n' % n_likely_nodes)
-            naive_file.write('%d\n' % l_path)
-            naive_file.write('%d\n' % n_node_overlap)
-
-        venn2(
-            subsets=(n_likely_nodes - n_node_overlap, l_path - n_node_overlap, n_node_overlap),
-            set_labels=('guessed states', 'real states')
-        )
-        plt.title('Overlap of states based on data\nno total reference', fontsize=21)
-        if save_fig:
-            plt.savefig('figures/power_of_%d/chess_naive/%s_naive_venn_%d.png' % (n_pos, save_prefix, i_iter))
             plt.close()
         else:
             plt.show()
