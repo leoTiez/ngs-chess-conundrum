@@ -4,7 +4,7 @@ from scipy.stats import beta as beta_distr
 from scipy.special import binom
 from itertools import combinations
 from collections import Counter
-
+import networkx as nx
 
 def to_bitstring(number: int, n_digits: int = 8):
     container = np.zeros(n_digits, dtype=int)
@@ -62,3 +62,20 @@ def calc_weights(idc: Iterable):
     occurrence = {k: occurrence[k] for k in sorted(occurrence.keys())}
     weighing = np.array(list(occurrence.values()), dtype='float')
     return weighing / np.max(weighing)
+
+
+def create_network(n_states: int, p_edge: float):
+    graph_cyclic = nx.fast_gnp_random_graph(n=n_states, p=p_edge, directed=True)
+    graph = nx.DiGraph()
+    graph.add_nodes_from(graph_cyclic.nodes())
+    graph.add_edges_from([(u, v) for (u, v) in graph_cyclic.edges() if u < v])
+    return graph
+
+
+def determine_shortest_longest_path(graph: nx.DiGraph):
+    path_dist = nx.floyd_warshall_numpy(graph)
+    sources, targets = np.where(path_dist == path_dist[~np.isinf(path_dist)].max())
+    idx = np.random.choice(len(sources))
+    s, t = sources[idx], targets[idx]
+    path = nx.dijkstra_path(graph, s, t)
+    return path, path_dist
