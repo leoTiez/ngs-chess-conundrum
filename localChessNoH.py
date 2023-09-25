@@ -63,6 +63,7 @@ class RF:
             eps_decay=100,
             tau=0.1,
             lr=1e-5,
+            weight_decay=10.,
             device=torch.device('cpu')
     ):
         self.n_obs = n_obs
@@ -77,28 +78,26 @@ class RF:
 
         self.qdn_policy = DQN(self.n_obs, self.n_act).to(self.device)
         self.qdn_target = DQN(self.n_obs, self.n_act).to(self.device)
-        self.optimizer = torch.optim.AdamW(self.qdn_policy.parameters(), lr=lr, amsgrad=True)
+        self.optimizer = torch.optim.RMSprop(self.qdn_policy.parameters(), lr=lr, weight_decay=weight_decay)
         self.memory = ReplayMemory()
 
     def _calc_eps(self, i_iter):
         return self.eps_end + (self.eps_start - self.eps_end) * torch.exp(- torch.tensor(i_iter / self.eps_decay))
 
     def select_action(self, i_iter, state):
-        sample = torch.rand(1)[0]
+        sample = torch.rand(self.batch_size)
         eps_threshold = self._calc_eps(i_iter)
-        if sample > eps_threshold:
-            with torch.no_grad():
-                return torch.multinomial(
-                    self.qdn_policy.sample(state),
-                    num_samples=self.batch_size,
-                    replacement=True
-                ).reshape(-1)
-        else:
-            return torch.tensor(
-                np.random.choice(self.n_act, replace=True, size=self.batch_size),
-                device=self.device,
-                dtype=torch.long
-            )
+        actions = torch.multinomial(
+            self.qdn_policy.sample(state),
+            num_samples=self.batch_size,
+            replacement=True
+        ).reshape(-1)
+        actions[sample < eps_threshold] = torch.tensor(
+            np.random.choice(self.n_act, replace=True, size=int(torch.sum(sample < eps_threshold))),
+            device=self.device,
+            dtype=torch.long
+        )
+        return actions
 
     def train_step(self):
         if len(self.memory) < self.batch_size:
@@ -229,7 +228,7 @@ def main():
     n_epochs = 500
     batch_size = 100
     save_fig = True
-    tp_idc = torch.tensor([250, 700, 1050])
+    tp_idc = torch.tensor([100, 250, 700, 1050])
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     data = torch.tensor(np.loadtxt('data/sampled_paths/dataNoH.csv')).to(device)
     rf = RF(
