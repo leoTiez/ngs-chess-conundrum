@@ -72,6 +72,7 @@ class RF:
             eps_decay=100,
             tau=0.1,
             lr=1e-2,
+            weight_decay=10.,
             device=torch.device('cpu')
     ):
         self.n_obs = n_obs
@@ -86,7 +87,7 @@ class RF:
 
         self.qdn_policy = DQN(self.n_obs, self.n_act).to(self.device)
         self.qdn_target = DQN(self.n_obs, self.n_act).to(self.device)
-        self.optimizer = torch.optim.AdamW(self.qdn_policy.parameters(), lr=lr, amsgrad=True)
+        self.optimizer = torch.optim.RMSprop(self.qdn_policy.parameters(), lr=lr, weight_decay=weight_decay)
         self.memory = ReplayMemory()
 
     def calc_eps(self, i_iter):
@@ -98,19 +99,21 @@ class RF:
         with torch.no_grad():
             theta_mu = self.qdn_policy.predict(state)
             a_mu = calc_a(state, theta=theta_mu)
-            a_0 = torch.sum(a_mu)
+            a_0 = torch.sum(a_mu, dim=1)
             r1, r2 = torch.rand(size=(2, state.shape[0]))
             # Update t
             tau = (1. / a_0) * torch.log(1. / r1)
             # Update state
-            mu = torch.searchsorted(torch.cumsum(a_mu, dim=0), (a_0 * r2).reshape(-1, 1)).reshape(-1).type(torch.long)
+            mu = torch.searchsorted(torch.cumsum(a_mu, dim=1), (a_0 * r2).reshape(-1, 1)).reshape(-1).type(torch.long)
 
-            random_mask = torch.logical_or(a_0 == 0, sample <= eps_threshold)
-            mu[random_mask] = torch.tensor(
-                np.random.choice(self.n_act, replace=True, size=int(torch.sum(random_mask))),
-                device=self.device,
-                dtype=torch.long
-            )
+            random_idc = torch.where(sample <= eps_threshold)[0]
+            action_indices = np.arange(self.n_act)
+            for ridc in random_idc:
+                mu[ridc] = torch.tensor(
+                    np.random.choice(action_indices[a_mu[ridc] > 0]),
+                    device=self.device,
+                    dtype=torch.long
+                )
         return mu, tau
 
     def train_step(self):
@@ -219,14 +222,19 @@ TRANSITIONS = {
 
 
 def calc_a(current_state, theta=None):
-    a_mu = torch.zeros(len(TRANSITIONS))
+    did_reshape = False
+    if len(current_state.shape) < 2:
+        current_state = current_state.reshape(1, -1)
+        did_reshape = True
+    a_mu = torch.zeros((current_state.shape[0], len(TRANSITIONS)))
     for mu, (fun, c) in enumerate(TRANSITIONS.items()):
         if theta is None:
             prob = c
         else:
             prob = theta[mu]
-        a_mu[mu] = fun(current_state, do_determine_interact=True) * prob
-    return a_mu
+        for i_cs, cs in enumerate(current_state):
+            a_mu[i_cs, mu] = fun(cs, do_determine_interact=True) * prob
+    return a_mu.reshape(-1) if did_reshape else a_mu
 
 
 def create_path(size, sim_time, sample_time, i_path: int = 0):
@@ -319,6 +327,7 @@ def main():
             action, tau = rf.select_action(i_epoch, state)
             # Use minimum tau in early epochs to make sure enough steps are sampled
             t += torch.mean(tau)
+            # t += torch.max(tau) TODO
             for i_state, i_action in enumerate(action):
                 state[i_state] = list(TRANSITIONS.keys())[i_action](state[i_state])
             if sample_idx is not None and t > sample_time[sample_idx]:
