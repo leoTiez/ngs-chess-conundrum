@@ -28,10 +28,22 @@ def create_sample(alpha: float, beta: float, path: list, sample_size: int, n_dig
 
 
 def decompose_states(data: np.ndarray, n_samples: int):
+    # Flip successively rows to get all state combinations
+    # This makes use of the observation that the order of states doesn't matter:
+    # The set [state1, state2, state3] describes the same combinations as [state3, state1, state2]
+    # We begin with the easiest state combination: fill the first n states for position i with 1
+    # where n(i) is the data value at position i
     cell_sample = np.zeros((n_samples, data.shape[0]), dtype='int')
     for i_d, d in enumerate(data):
         cell_sample[:d, i_d] = 1
 
+    # Now we successively flip columns to create all possible state combinations. This flipping
+    # produces a result that is equivalent to sorting with respect to the flipped columns.
+    # Compute here the number of column flipping to be performed. Note that flipping is supposed to produce a new
+    # state permutation. Hence, when flipping all columns, all states remain exactly the same. Similarly, when
+    # considering 8 positions, flipping 2 produces the same state combinations as flipping 6.
+    # Note that this produces a special case when having an even number of positions. When considering 8 loci again,
+    # flipping any 4 columns produces the same combinations as flipping the exact opposite 4.
     possible_state_combinations = [binom(data.shape[0], i) for i in range(data.shape[0] // 2 + 1)]
     if data.shape[0] % 2 == 1:
         n_possible_samples = sum(possible_state_combinations)
@@ -42,13 +54,16 @@ def decompose_states(data: np.ndarray, n_samples: int):
     print('Number of possible state combinations: %d' % n_possible_samples)
     all_samples = [cell_sample.copy()]
     for i_flip, n_flip in enumerate(possible_state_combinations):
+        # Ignore the case when no column is flipped
         if i_flip == 0:
             continue
+        # Get a combination of all column that can be flipped to produce new combinations
         possible_row_comb = list(combinations(range(data.shape[0]), int(i_flip)))[:int(n_flip)]
         for idx_tuple in possible_row_comb:
             idx_array = np.array(list(idx_tuple))
             if np.any(data[idx_array] == 0) or np.any(data[idx_array] == n_samples):
                 continue
+            # Flip column and add to possible state combinations
             cs = cell_sample.copy()
             for idx in idx_array:
                 cs[:, idx] = cs[::-1, idx]
