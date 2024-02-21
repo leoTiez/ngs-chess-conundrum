@@ -28,7 +28,7 @@ def main(args):
                     for nt in n_train_sample:
                         save_string = 'iter%d_%d_%d_%d' % (i_iter, np, bc, nt)
                         parallel.apply_async(os.system, args=(
-                            'python3.8 chessNN.py '
+                            'python3.9 chessNN.py '
                             '--n_pos=%d '
                             '--beta_concentration=%s '
                             '--train_sample_size=%d '
