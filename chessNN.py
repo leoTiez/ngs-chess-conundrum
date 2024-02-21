@@ -86,6 +86,8 @@ def main(args):
     eps_boundaries = (args.eps_start, args.eps_end, args.eps_decline)
     save_prefix = args.save_prefix
     save_fig = args.save_fig
+
+    Path('data/power_of_%d/chessnn/pmat' % n_pos).mkdir(exist_ok=True, parents=True)
     cmap = plt.get_cmap('gist_rainbow')
     sm = ScalarMappable(norm=Normalize(vmin=0., vmax=1.), cmap=cmap)
 
@@ -126,6 +128,8 @@ def main(args):
             print('Epoch: %d' % i_epoch)
             print('Most likely start %d' % np.argmax(np.max(p, axis=0)))
             print('Most likely end %d' % np.argmax(np.max(p, axis=1)))
+            np.savetxt('data/power_of_%d/chessnn/pmat/pmat_%d.csv' % i_epoch, p)
+
         eps = calc_eps(i_epoch)
         if eps < np.random.random():
             n = np.random.choice(n_states * n_states, p=p.reshape(-1))
@@ -156,7 +160,6 @@ def main(args):
         p /= np.sum(p)
 
     p_c = p.copy()
-    Path('data/power_of_%d/chessnn' % n_pos).mkdir(exist_ok=True, parents=True)
     for i_path in range(n_path):
         if np.all(p_c == 0):
             break
