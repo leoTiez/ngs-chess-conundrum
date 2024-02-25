@@ -14,12 +14,12 @@ def parse_args(args):
 
 def main(args):
     n_cpus = args.n_cpus
-    n_epoch = 50000
+    n_epoch = 30000
     eps_decline = n_epoch / 4.
     npos = range(6, 12, 1)
     beta_concentration = [1., 10., 100., 1000.]
     n_train_sample = [10., 20., 50., 100., 200]
-    n_iter = 500
+    n_iter = 100
     Path('log').mkdir(exist_ok=True, parents=True)
     with multiprocessing.Pool(processes=n_cpus) as parallel:
         for i_iter in range(n_iter):
