@@ -46,6 +46,8 @@ def parse_arguments(args):
                         help='Prefix that is added the saved data files.')
     parser.add_argument('--save_fig', action='store_true', dest='save_fig',
                         help='If set, save figures to file.')
+    parser.add_argument("--save_mat", action="store_true", dest="save_mat",
+                        help="If set, save probability matrix of start and end point in path after each iteration.")
 
     return parser.parse_args(args)
 
@@ -84,6 +86,7 @@ def main(args):
     p_edge = args.p_connect
     use_kamada_kawai_layout = args.use_kamada_kawai_layout
     eps_boundaries = (args.eps_start, args.eps_end, args.eps_decline)
+    save_mat = args.save_mat
     save_prefix = args.save_prefix
     save_fig = args.save_fig
 
@@ -128,7 +131,8 @@ def main(args):
             print('Epoch: %d' % i_epoch)
             print('Most likely start %d' % np.argmax(np.max(p, axis=0)))
             print('Most likely end %d' % np.argmax(np.max(p, axis=1)))
-            np.savetxt('data/power_of_%d/chessnn/pmat/pmat_%d.csv' % (n_pos, i_epoch), p)
+            if save_mat:
+                np.savetxt('data/power_of_%d/chessnn/pmat/pmat_%d.csv' % (n_pos, i_epoch), p)
 
         eps = calc_eps(i_epoch)
         if eps < np.random.random():
