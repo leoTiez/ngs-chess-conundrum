@@ -128,7 +128,7 @@ def main(args):
             print('Epoch: %d' % i_epoch)
             print('Most likely start %d' % np.argmax(np.max(p, axis=0)))
             print('Most likely end %d' % np.argmax(np.max(p, axis=1)))
-            np.savetxt('data/power_of_%d/chessnn/pmat/pmat_%d.csv' % i_epoch, p)
+            np.savetxt('data/power_of_%d/chessnn/pmat/pmat_%d.csv' % (n_pos, i_epoch), p)
 
         eps = calc_eps(i_epoch)
         if eps < np.random.random():
@@ -234,7 +234,7 @@ def main(args):
     plt.colorbar(sm, cax=cax, orientation='vertical', label='weighting')
 
     if save_fig:
-        plt.savefig('figures/chessnn/%s_nnpaths.png' % save_prefix)
+        plt.savefig('figures/power_of_%d/chessnn/%s_nnpaths.png' % (n_pos, save_prefix))
         plt.close()
     else:
         plt.show()
