@@ -83,6 +83,10 @@ def main(args):
     save_fig = args.save_fig
     cmap = plt.get_cmap('gist_rainbow')
 
+    # Create path structure
+    Path('figures/power_of_%d/chess_naive' % n_pos).mkdir(exist_ok=True, parents=True)
+    Path('data/power_of_%d/chess_naive/path_determination' % n_pos).mkdir(exist_ok=True, parents=True)
+    
     # Create sampling distributions
     beta_modes = np.array([.2, .5, .8])
     beta_concent = args.beta_concentration
@@ -136,7 +140,6 @@ def main(args):
             fig.suptitle('RPM probability', fontsize=32)
             fig.tight_layout()
             if save_fig:
-                Path('figures/power_of_%d/chess_naive' % n_pos).mkdir(exist_ok=True, parents=True)
                 plt.savefig('figures/power_of_%d/chess_naive/%s_all_possible_nodes_weighted%d.png' % (n_pos, save_prefix, i_iter))
                 plt.close()
             else:
@@ -153,7 +156,6 @@ def main(args):
         likely_subgraph = graph.subgraph(idc_all)
         n_likely_nodes = len(likely_subgraph.nodes)
         n_node_overlap = len(set(likely_subgraph.nodes).intersection(path))
-        Path('data/power_of_%d/chess_naive/path_determination' % n_pos).mkdir(exist_ok=True, parents=True)
         with open('data/power_of_%d/chess_naive/path_determination/%s_naive_%d.txt'
                   % (n_pos, save_prefix, i_iter), 'w') as naive_file:
             naive_file.write('%d\n' % n_likely_nodes)
@@ -224,7 +226,6 @@ def main(args):
         fig.suptitle('Connectivity based on most likely nodes\nno total reference', fontsize=32)
         fig.tight_layout()
         if save_fig:
-            Path('figures/power_of_%d/chess_naive' % n_pos).mkdir(exist_ok=True, parents=True)
             plt.savefig('figures/power_of_%d/chess_naive/%s_naive_%d.png' % (n_pos, save_prefix, i_iter))
             plt.close()
         else:
