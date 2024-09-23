@@ -30,3 +30,6 @@ Similarly, the bottom-up model is implemented in the file `chessNN.py`. Check th
 ```console
 python3 chess.NN.py --help
 ```
+
+## Jupyter notebooks
+We added two Jupyter notebooks that visualise some additional concepts. `Distributions.ipynb` provides an overview how different parameters influence the beta distribution, as well as distributions in the game graph.  `Performance Analysis.ipynb` loads and visualise the results of the simulations. Please note that this notebook is not stand-alone, and you need to produce the simulation results yourself in the first place. To do so, run the `experimentsChessNN.py` and the `experimentsChess.py` scripts.
