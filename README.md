@@ -1,6 +1,9 @@
 # The Next Generation Sequencing-Chess Problem
 The development of Next Generation Sequencing (NGS) technologies paved the way for studying the spatiotemporal coordination of cellular processes along the genome. However, data sets are commonly limited to a few time points, and missing information needs to be interpolated. Most models assume that the studied dynamics are similar between individual cells, so that a homogeneous cell culture can be represented by a population-wide average. Here, we demonstrate that this understanding can be inappropriate. We developed a thought experiment--which we call the NGS chess problem--in which we compare the temporal sequencing data analysis to observing a superimposed picture of many independent games of chess at a time. The analysis of the spatiotemporal kinetics advocates for a new methodology that considers DNA-particle interactions in each cell independently even for a homogeneous cell population.
 
+If you found our thought experiment helpful for your own studies, please consider citing:
+> Leo Zeitler, Arach Goldar, Cyril Denby Wilkes, Julie Soutourina, The next-generation sequencing—chess problem, NAR Genomics and Bioinformatics, Volume 6, Issue 4, December 2024, lqae144, https://doi.org/10.1093/nargab/lqae144
+
 ## Requirements and Installation
 The code was run on `Python3.8` and `Python3.9`. Install the necessary packages via `pip` by running
 
